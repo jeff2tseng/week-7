@@ -3,6 +3,8 @@ const { Pool } = require("pg");
 const { createClient } = require("redis");
 require("dotenv").config();
 
+console.log(process.env);
+
 const config = {
   host: process.env.PSQL_HOSTNAME,
   user: process.env.PSQL_USERNAME,
@@ -25,10 +27,18 @@ const cacheConnection = createClient({
   password: cachePassword,
 });
 const setupRedis = async () => {
-  if (!redisConnected) {
+  try {
+    if (!redisConnected) {
+      await cacheConnection.connect();
+    }
+  } catch (e) {
+    console.error(e);
+    cacheConnection.disconnect();
     await cacheConnection.connect();
+  } finally {
     redisConnected = true;
   }
+
   return cacheConnection;
 };
 
@@ -65,12 +75,16 @@ app.get("/hist_log", async (req, res) => {
   const client = await setupRedis();
   const cachedValue = await client.get("cache");
   if (isDirty || !cachedValue) {
-    const responseString = await getHistory();
-    if (responseString === undefined) res.sendStatus(400);
-    await client.set("cache", responseString);
-    console.log("from source data");
-    res.send(responseString);
-    isDirty = false;
+    try {
+      const responseString = await getHistory();
+      if (responseString === undefined) res.sendStatus(400);
+      await client.set("cache", responseString);
+      console.log("from source data");
+      isDirty = false;
+      res.send(responseString);
+    } catch (e) {
+      console.log(e);
+    }
   } else {
     console.log("from cached data");
     res.send(cachedValue);
