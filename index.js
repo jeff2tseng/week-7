@@ -1,13 +1,13 @@
-const { response } = require("express");
 const express = require("express");
-const { Pool, Client } = require("pg");
-
+const { Pool } = require("pg");
+require("dotenv").config();
 const config = {
-  host: "localhost",
-  user: "nl",
-  password: "1213",
-  database: "azure",
-  port: 5432,
+  host: process.env.PSQL_HOSTNAME,
+  user: process.env.PSQL_USERNAME,
+  password: process.env.PSQL_PASSWD,
+  database: process.env.PSQL_DB,
+  port: process.env.PSQL_PORT,
+  ssl: true,
 };
 
 const app = express();
@@ -16,7 +16,11 @@ const port = process.env.PORT || 3000;
 const pool = new Pool(config);
 
 app.get("/", (req, res) => {
-  res.send("Please go to https://www.twitch.tv/never_loses");
+  res
+    .writeHead(301, {
+      Location: "https://www.twitch.tv/never_loses",
+    })
+    .end();
 });
 
 app.get("/hist_log", (req, res) => {
@@ -70,4 +74,16 @@ app.listen(port, async () => {
         )"
     )
     .then(() => console.log("Table created!"));
+    
+    pool
+    .query(
+      `SELECT * FROM azure_table`
+    )
+    .then((queryResult) => {
+      let responseString = queryResult["rows"]
+        .map((row) => `${row.num1} + ${row.num2} = ${row.sum}`)
+        .join("\n");
+      console.log(responseString);
+    })
+    .catch((err) => console.error(err));
 });
